@@ -59,6 +59,10 @@ shiny-chat-message {
     white-space: pre;
     overflow-x: auto;
   }
+  img {
+    max-height: var(--shiny-chat-message-img-max-height, 150px);
+    max-width: 100%;
+  }
 }
 
 shiny-chat-input {
@@ -66,6 +70,98 @@ shiny-chat-input {
   position: sticky;
   background-color: var(--bs-body-bg, white);
   bottom: 0;
+
+  button {
+    background-color: transparent;
+    color: var(--bs-body-color, #444);
+    display: flex;
+    cursor: pointer;
+    position: absolute;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+
+    &:disabled {
+      cursor: not-allowed;
+      color: var(--bs-gray-500, #8d959e);
+    }
+  }
+
+  .attachments {
+    display: flex;
+    overflow-x: auto;
+    flex-direction: row;
+    gap: 0.5rem;
+    margin-inline: calc(26px / 2);
+    background-color: rgba(var(--bs-primary-rgb), 0.2);
+    border-top-left-radius: var(--bs-border-radius);
+    border-top-right-radius: var(--bs-border-radius);
+    padding: calc(var(--bslib-spacer, 1.5rem) / 2);
+    transition: height 250ms ease-out;
+    height: 125px;
+
+    &[data-items="0"] {
+      height: 0;
+      padding: 0;
+    }
+
+    .attachment {
+      position: relative;
+      height: 100%;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      background-color: rgba(var(--bs-body-bg-rgb), 0.5);
+      border-radius: var(--bs-border-radius);
+      padding: 4px;
+
+      &:hover .btn-attachment-close,
+      .btn-attachment-close:focus {
+        opacity: 1;
+      }
+    }
+    .attachment-thumbnail {
+      max-height: 100%;
+      max-width: 200px;
+      transition: transform 250ms ease-in-out;
+    }
+  }
+
+  .btn-attachment-close {
+    --size: 1.25rem;
+    opacity: 0;
+    color: var(--bs-body-bg, white);
+    background-color: var(--bs-body-color, #444);
+    top: calc(var(--size) / -2);
+    right: calc(var(--size) / -2);
+    aspect-ratio: 1;
+    width: var(--size);
+    height: var(--size);
+    font-size: 1.25rem;
+    z-index: 1;
+  }
+
+  .btn-attachment-close::after {
+    // increase touch target size
+    content: "";
+    height: calc(var(--size) * 2);
+    width: calc(var(--size) * 2);
+    position: absolute;
+    border-radius: 50%;
+  }
+
+  .btn-attachment-close:hover,
+  .btn-attachment-close:focus-visible {
+    & + .attachment-thumbnail {
+      transform: scale(0.9);
+      transform-origin: center center;
+    }
+  }
+
   textarea {
     --bs-border-radius: 26px;
     resize: none;
@@ -75,22 +171,13 @@ shiny-chat-input {
       color: var(--bs-gray-600, #707782) !important;
     }
   }
-  button {
-    position: absolute;
+
+  .btn-send-message {
     bottom: 7px;
     right: 8px;
-    background-color: transparent;
     color: var(--bs-primary, #007bc2);
     transition: color 0.25s ease-in-out;
-    border: none;
-    padding: 0;
-    cursor: pointer;
     line-height: 16px;
-    border-radius: 50%;
-    &:disabled {
-      cursor: not-allowed;
-      color: var(--bs-gray-500, #8d959e);
-    }
   }
 }
 

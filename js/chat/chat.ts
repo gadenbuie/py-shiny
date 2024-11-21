@@ -30,6 +30,7 @@ type requestScrollEvent = {
 type UpdateUserInput = {
   value?: string;
   placeholder?: string;
+  attachments?: ChatInputAttachment[];
 };
 
 // https://github.com/microsoft/TypeScript/issues/28357#issuecomment-748550734
@@ -255,9 +256,16 @@ class ChatMessages extends LightElement {
   }
 }
 
+interface ChatInputAttachment {
+  type: string;
+  name: string;
+  data: string;
+}
+
 class ChatInput extends LightElement {
   @property() placeholder = "Enter a message...";
   @property({ type: Boolean, reflect: true }) disabled = false;
+  @property({ type: Array }) attachments: ChatInputAttachment[] = [];
 
   private get textarea(): HTMLTextAreaElement {
     return this.querySelector("textarea") as HTMLTextAreaElement;
@@ -271,8 +279,8 @@ class ChatInput extends LightElement {
     return this.value.trim().length === 0;
   }
 
-  private get button(): HTMLButtonElement {
-    return this.querySelector("button") as HTMLButtonElement;
+  private get sendButton(): HTMLButtonElement {
+    return this.querySelector(".btn-send-message") as HTMLButtonElement;
   }
 
   render(): ReturnType<LitElement["render"]> {
@@ -280,6 +288,27 @@ class ChatInput extends LightElement {
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-up-circle-fill" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 0 0 8a8 8 0 0 0 16 0m-7.5 3.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707z"/></svg>';
 
     return html`
+      <div class="attachments" data-items="${this.attachments.length}">
+        ${this.attachments.map(
+          (attachment, index) => html`
+            <div class="attachment">
+              <button
+                type="button"
+                class="btn-attachment-close"
+                aria-label="Delete attachment"
+                @click="${() => this.#removeAttachment(index)}"
+              >
+                &times;
+              </button>
+              <img
+                src="${attachment.data}"
+                alt="${attachment.name} preview"
+                class="attachment-thumbnail"
+              />
+            </div>
+          `
+        )}
+      </div>
       <textarea
         id="${this.id}"
         class="form-control textarea-autoresize"
@@ -287,10 +316,12 @@ class ChatInput extends LightElement {
         placeholder="${this.placeholder}"
         @keydown=${this.#onKeyDown}
         @input=${this.#onInput}
+        @paste=${this.#onPaste}
         data-shiny-no-bind-input
       ></textarea>
       <button
         type="button"
+        class="btn-send-message"
         title="Send message"
         aria-label="Send message"
         @click=${this.#sendInput}
@@ -299,6 +330,43 @@ class ChatInput extends LightElement {
       </button>
     `;
   }
+
+  #onPaste = async (event: ClipboardEvent) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.indexOf("image") !== -1) {
+        event.preventDefault();
+        const blob = item.getAsFile();
+        if (blob) {
+          const base64 = await this.#blobToBase64(blob);
+          const fileAttachment = {
+            type: blob.type,
+            name: blob.name,
+            data: base64,
+          };
+          console.log("Attaching file", fileAttachment);
+          this.attachments.push(fileAttachment);
+          this.requestUpdate();
+        }
+      }
+    }
+  };
+
+  #blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  #removeAttachment = (index: number) => {
+    this.attachments = this.attachments.filter((_, i) => i !== index);
+    this.requestUpdate();
+  };
 
   // Pressing enter sends the message (if not empty)
   #onKeyDown(e: KeyboardEvent): void {
@@ -310,7 +378,7 @@ class ChatInput extends LightElement {
   }
 
   #onInput(): void {
-    this.button.disabled = this.disabled
+    this.sendButton.disabled = this.disabled
       ? true
       : this.value.trim().length === 0;
   }
@@ -324,28 +392,52 @@ class ChatInput extends LightElement {
     if (this.valueIsEmpty) return;
     if (this.disabled) return;
 
-    Shiny.setInputValue!(this.id, this.value, { priority: "event" });
+    Shiny.setInputValue!(
+      this.id,
+      this.attachments.length
+        ? JSON.stringify({ content: this.value, attachments: this.attachments })
+        : this.value,
+      { priority: "event" }
+    );
+
+    let message = this.value;
+    for (const attachment of this.attachments) {
+      if (attachment.type.indexOf("image") === -1) {
+        continue;
+      }
+      message += `\n\n![](${attachment.data})`;
+    }
 
     // Emit event so parent element knows to insert the message
     const sentEvent = new CustomEvent("shiny-chat-input-sent", {
-      detail: { content: this.value, role: "user" },
+      detail: { content: message, role: "user" },
       bubbles: true,
       composed: true,
     });
     this.dispatchEvent(sentEvent);
 
-    this.setInputValue("");
+    this.setInputValue({ content: "" });
 
     this.textarea.focus();
   }
 
-  setInputValue(value: string): void {
-    this.textarea.value = value;
-    this.disabled = value.trim().length === 0;
+  setInputValue({
+    content,
+    attachments = [],
+  }: {
+    content: string;
+    attachments?: ChatInputAttachment[];
+  }): void {
+    this.textarea.value = content;
 
     // Simulate an input event (to trigger the textarea autoresize)
     const inputEvent = new Event("input", { bubbles: true, cancelable: true });
     this.textarea.dispatchEvent(inputEvent);
+
+    if (attachments) {
+      this.attachments = attachments;
+      this.requestUpdate();
+    }
   }
 }
 
@@ -491,9 +583,9 @@ class ChatContainer extends LightElement {
   }
 
   #onUpdateUserInput(event: CustomEvent<UpdateUserInput>): void {
-    const { value, placeholder } = event.detail;
+    const { value, placeholder, attachments } = event.detail;
     if (value !== undefined) {
-      this.input.setInputValue(value);
+      this.input.setInputValue({ content: value, attachments });
     }
     if (placeholder !== undefined) {
       this.input.placeholder = placeholder;
