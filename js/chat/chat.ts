@@ -276,7 +276,7 @@ class ChatInput extends LightElement {
   }
 
   private get valueIsEmpty(): boolean {
-    return this.value.trim().length === 0;
+    return this.value.trim().length === 0 && this.attachments.length === 0;
   }
 
   private get sendButton(): HTMLButtonElement {
@@ -351,6 +351,7 @@ class ChatInput extends LightElement {
           this.requestUpdate();
         }
       }
+      this.#onInput();
     }
   };
 
@@ -378,9 +379,7 @@ class ChatInput extends LightElement {
   }
 
   #onInput(): void {
-    this.sendButton.disabled = this.disabled
-      ? true
-      : this.value.trim().length === 0;
+    this.sendButton.disabled = this.disabled ? true : this.valueIsEmpty;
   }
 
   // Determine whether the button should be enabled/disabled on first render
