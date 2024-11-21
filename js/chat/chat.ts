@@ -388,6 +388,13 @@ class ChatInput extends LightElement {
     this.#onInput();
   }
 
+  // Recheck button state when `this.disabled` updates
+  updated(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has("disabled")) {
+      this.#onInput();
+    }
+  }
+
   #sendInput(): void {
     if (this.valueIsEmpty) return;
     if (this.disabled) return;
@@ -419,6 +426,7 @@ class ChatInput extends LightElement {
     this.setInputValue({ content: "" });
 
     this.textarea.focus();
+    this.disabled = true; // Will be re-enabled by #finalizeMessage() when we get a response
   }
 
   setInputValue({
@@ -598,6 +606,7 @@ class ChatContainer extends LightElement {
   }
 
   #finalizeMessage(): void {
+    console.log("message finalized!");
     this.input.disabled = false;
   }
 
